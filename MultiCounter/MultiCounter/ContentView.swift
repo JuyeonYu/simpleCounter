@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import AVFoundation
 
 struct CountModel: Codable, Identifiable {
   var id: UUID = UUID()
@@ -34,6 +35,10 @@ struct CountModel: Codable, Identifiable {
 
 
 struct ContentView: View {
+  @State private var isPressing: Bool = false
+  @State private var timer: Timer?
+
+  
   @AppStorage("CountModels") private var countsData: Data = Data()
   @State private var counts: [CountModel] = [
     CountModel(),
@@ -101,18 +106,25 @@ struct ContentView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-              
-              switch mode {
-              case .plus:
-                count.value += 1
-              case .minus:
-                count.value -= 1
-              case .reset:
-                count.value = 0
-              }
-              
-              saveMyStructArray()
+              commonAction(count: &count)
             }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                      timer?.invalidate()
+                      timer = nil
+
+                      timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                        commonAction(count: &count)
+                      }
+                    }
+                    .onEnded { _ in
+                      timer?.invalidate()
+                      timer = nil
+                    }
+            )
+
+
             
             HStack {
               ColorPicker("", selection: $count.foregroundColor)
@@ -139,13 +151,27 @@ struct ContentView: View {
     }
     .ignoresSafeArea(.all)
     .tabViewStyle(.page(indexDisplayMode: .always))
-//    .tabViewStyle(.page)
     
     .onAppear(perform: {
       loadMyStructArray()
     })
   }
-  
+    
+    
+  private func commonAction( count: inout CountModel) {
+    let generator = UIImpactFeedbackGenerator(style: .medium)
+    generator.impactOccurred()
+    switch mode {
+    case .plus:
+      count.value += 1
+    case .minus:
+      count.value -= 1
+    case .reset:
+      count.value = 0
+    }
+    
+    saveMyStructArray()
+  }
   private func saveMyStructArray() {
     do {
       let encoder = JSONEncoder()
