@@ -11,8 +11,8 @@ import SwiftData
 struct CountModel: Codable, Identifiable {
   var id: UUID = UUID()
   var value: Int = 0
-  var backgroundColorHex: String = "ffffff"
-  var foregroundColorHex: String = "000000"
+  var backgroundColorHex: String = "000000"
+  var foregroundColorHex: String = "ffffff"
   
   var backgroundColor: Color {
     get {
@@ -84,7 +84,7 @@ struct ContentView: View {
                       Image(systemName: "arrow.clockwise.circle")
                         .resizable()
                         .frame(width: 100, height: 100)
-                        .tint(.black)
+                        .tint(count.backgroundColor.opposite)
                         .padding()
                     }
                   })
@@ -114,7 +114,7 @@ struct ContentView: View {
               saveMyStructArray()
             }
             
-            HStack {              
+            HStack {
               ColorPicker("", selection: $count.foregroundColor)
                 .labelsHidden()
                 .onChange(of: count.foregroundColor) {
@@ -138,7 +138,9 @@ struct ContentView: View {
       }
     }
     .ignoresSafeArea(.all)
-    .tabViewStyle(.page)
+    .tabViewStyle(.page(indexDisplayMode: .always))
+//    .tabViewStyle(.page)
+    
     .onAppear(perform: {
       loadMyStructArray()
     })

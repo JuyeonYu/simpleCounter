@@ -10,6 +10,19 @@ import Foundation
 import SwiftUI
 
 extension Color {
+  var opposite: Color {
+    let uiColor = UIColor(self)
+    
+    var red: CGFloat = 0
+    var green: CGFloat = 0
+    var blue: CGFloat = 0
+    var alpha: CGFloat = 0
+    
+    uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+    
+    return Color(red: 1.0 - red, green: 1.0 - green, blue: 1.0 - blue, opacity: alpha)
+  }
+  
   init?(hex: String) {
     let r, g, b: CGFloat
     var hexColor = hex
