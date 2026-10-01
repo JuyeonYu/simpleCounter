@@ -113,26 +113,12 @@ struct ContentView: View {
               Button(action: {
                 mode = mode.next()
               }, label: {
-                switch mode {
-                case .plus:
-                  Image(systemName: "plus.circle")
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .tint(.red)
-                    .padding()
-                case .minus:
-                  Image(systemName: "minus.circle")
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .tint(.blue)
-                    .padding()
-                case .reset:
-                  Image(systemName: "arrow.clockwise.circle")
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .tint(count.wrappedValue.backgroundColor.opposite)
-                    .padding()
-                }
+                Image(systemName: mode.symbolName)
+                  .resizable()
+                  .frame(width: 100, height: 100)
+                  .tint(mode.color(on: count.wrappedValue.backgroundColor,
+                                   foreground: count.wrappedValue.foregroundColor))
+                  .padding()
               })
 
               // 비어 있으면 보이지 않고, 이 자리를 탭하면 바로 입력

@@ -68,4 +68,23 @@ enum CountMode: String, CaseIterable, Codable {
     }
     return self
   }
+
+  var symbolName: String {
+    switch self {
+    case .plus: "plus.circle"
+    case .minus: "minus.circle"
+    case .reset: "arrow.clockwise.circle"
+    }
+  }
+
+  /// 모드 버튼 색. 기본은 + 빨강, - 파랑이고, 배경과 비슷해 안 보이면 글자색으로 바꿈
+  func color(on background: Color, foreground: Color) -> Color {
+    let preferred: Color
+    switch self {
+    case .plus: preferred = .red
+    case .minus: preferred = .blue
+    case .reset: preferred = background.opposite
+    }
+    return preferred.readable(on: background, fallback: foreground)
+  }
 }

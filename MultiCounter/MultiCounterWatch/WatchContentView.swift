@@ -43,9 +43,9 @@ struct WatchContentView: View {
         Button {
           mode = mode.next()
         } label: {
-          Image(systemName: modeSymbol)
+          Image(systemName: mode.symbolName)
             .font(.system(size: 26))
-            .foregroundStyle(modeColor(for: counter))
+            .foregroundStyle(mode.color(on: counter.backgroundColor, foreground: counter.foregroundColor))
             .frame(width: 44, height: 36)
         }
         .buttonStyle(.plain)
@@ -68,22 +68,6 @@ struct WatchContentView: View {
             store.apply(mode, to: counter.id)
           }
       }
-    }
-  }
-
-  private var modeSymbol: String {
-    switch mode {
-    case .plus: "plus.circle"
-    case .minus: "minus.circle"
-    case .reset: "arrow.clockwise.circle"
-    }
-  }
-
-  private func modeColor(for counter: CountModel) -> Color {
-    switch mode {
-    case .plus: .red
-    case .minus: .blue
-    case .reset: counter.backgroundColor.opposite
     }
   }
 }
