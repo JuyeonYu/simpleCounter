@@ -121,7 +121,7 @@ iOSInjectionProject/
 ### SwiftPackageManager ###
 Packages
 xcuserdata
-*.xcodeproj
+# *.xcodeproj  (프로젝트 파일은 커밋함)
 
 
 ### Xcode ###

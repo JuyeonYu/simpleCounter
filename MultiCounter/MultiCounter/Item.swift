@@ -9,22 +9,6 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-enum CountMode: String, CaseIterable, Codable  {
-  case plus
-  case minus
-  case reset
-  
-  func next() -> CountMode {
-      let allModes = CountMode.allCases
-      if let currentIndex = allModes.firstIndex(of: self) {
-          let nextIndex = (currentIndex + 1) % allModes.count
-          return allModes[nextIndex]
-      }
-      return self
-  }
-
-}
-
 @Model
 class CountState {
     var count: Int

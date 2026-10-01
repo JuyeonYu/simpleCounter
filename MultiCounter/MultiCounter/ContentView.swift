@@ -2,251 +2,288 @@
 //  ContentView.swift
 //  MultiCounter
 //
-//  Created by  유 주연 on 8/25/24.
+//  Created by  유 주연 on 8/25/24.
 //
 
 import SwiftUI
-import SwiftData
-import AVFoundation
-
-struct CountModel: Codable, Identifiable {
-  var id: UUID = UUID()
-  var value: Int = 0
-  var backgroundColorHex: String = "000000"
-  var foregroundColorHex: String = "ffffff"
-  var label: String = ""
-
-  var backgroundColor: Color {
-    get {
-      Color(hex: backgroundColorHex) ?? .black
-    }
-    set {
-      backgroundColorHex = newValue.toHex() ?? ""
-    }
-  }
-  var foregroundColor: Color {
-    get {
-      Color(hex: foregroundColorHex) ?? .white
-    }
-    set {
-      foregroundColorHex = newValue.toHex() ?? ""
-    }
-  }
-}
-
-extension CountModel {
-  // 이전 버전에 저장된 데이터에는 없는 필드가 있어도 읽을 수 있도록 기본값으로 디코딩
-  init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-    value = try container.decodeIfPresent(Int.self, forKey: .value) ?? 0
-    backgroundColorHex = try container.decodeIfPresent(String.self, forKey: .backgroundColorHex) ?? "000000"
-    foregroundColorHex = try container.decodeIfPresent(String.self, forKey: .foregroundColorHex) ?? "ffffff"
-    label = try container.decodeIfPresent(String.self, forKey: .label) ?? ""
-  }
-}
-
 
 struct ContentView: View {
-  @State private var isPressing: Bool = false
-  @State private var timer: Timer?
+  private static let addPageID = UUID()
 
-  
-  @AppStorage("CountModels") private var countsData: Data = Data()
+  @State private var store = CounterStore.shared
+  @State private var proStore = ProStore.shared
+  @Environment(\.scenePhase) private var scenePhase
+
+  @State private var timer: Timer?
   @AppStorage("HapticsEnabled") private var hapticsEnabled: Bool = true
   @FocusState private var isEditingLabel: Bool
-  @State private var counts: [CountModel] = [
-    CountModel(),
-    CountModel(),
-    CountModel(),
-    CountModel(),
-    CountModel(),
-    CountModel(),
-    CountModel(),
-    CountModel(),
-    CountModel(),
-    CountModel()
-  ]
-  
-  @State var count: Int = 0
+
   @State var mode: CountMode = .plus
-  @State var header: String = ""
-  @State var backgroundColor: Color = .gray
-  @State var foregroundColor: Color = .white
-  
+  @State private var selection: UUID?
+  @State private var deletingCounterID: UUID?
+  @State private var showPaywall = false
+
   var body: some View {
-    TabView {
-      ForEach($counts) { $count in
-        ZStack {
-          VStack( spacing: 0) {
-            GeometryReader { geo in
-              ZStack(alignment: .top) {
-                // 숫자는 전체 영역의 정가운데에 고정
-                Text("\(count.value)")
-                  .foregroundStyle(count.foregroundColor)
-                  .lineLimit(1)
-                  .font(.system(size: geo.size.width))
-                  .minimumScaleFactor(0.1)
-                  .frame(maxWidth: .infinity, maxHeight: .infinity)
-                  .contentShape(Rectangle())
-                  .onTapGesture {
-                    // 레이블 입력 중이면 키보드만 내림
-                    if isEditingLabel {
-                      isEditingLabel = false
-                      return
-                    }
-                    commonAction(count: $count)
-                  }
-                  .onLongPressGesture(minimumDuration: 0.4, perform: {
-                    isEditingLabel = false
-                    stopRepeating()
-                    // 리셋은 반복할 필요가 없으므로 한 번만 실행
-                    guard mode != .reset else {
-                      commonAction(count: $count)
-                      return
-                    }
-                    timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                      commonAction(count: $count)
-                    }
-                  }, onPressingChanged: { isPressing in
-                    // 손을 떼거나 스와이프로 제스처가 취소되면 반복 중단
-                    if !isPressing {
-                      stopRepeating()
-                    }
-                  })
-
-                // 모드 버튼과 레이블은 숫자 위에 겹쳐서 배치
-                VStack(spacing: 0) {
-                  Button(action: {
-                    mode = mode.next()
-                  }, label: {
-                    switch mode {
-                    case .plus:
-                      Image(systemName: "plus.circle")
-                        .resizable()
-                        .frame(width: 100, height: 100)
-                        .tint(.red)
-                        .padding()
-                    case .minus:
-                      Image(systemName: "minus.circle")
-                        .resizable()
-                        .frame(width: 100, height: 100)
-                        .tint(.blue)
-                        .padding()
-                    case .reset:
-                      Image(systemName: "arrow.clockwise.circle")
-                        .resizable()
-                        .frame(width: 100, height: 100)
-                        .tint(count.backgroundColor.opposite)
-                        .padding()
-                    }
-                  })
-
-                  // 비어 있으면 보이지 않고, 이 자리를 탭하면 바로 입력
-                  TextField("", text: $count.label)
-                    .font(.system(size: 28, weight: .medium))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(count.foregroundColor)
-                    .tint(count.foregroundColor)
-                    .lineLimit(1)
-                    .submitLabel(.done)
-                    .focused($isEditingLabel)
-                    .frame(height: 44)
-                    .padding(.horizontal)
-                    .onChange(of: count.label) {
-                      saveMyStructArray()
-                    }
-                }
-                .padding(.top, 34)
-              }
-            }
-
-            HStack {
-              ColorPicker("", selection: $count.foregroundColor)
-                .labelsHidden()
-                .onChange(of: count.foregroundColor) {
-                  saveMyStructArray()
-                }
-              Spacer()
-
-              Button(action: {
-                hapticsEnabled.toggle()
-                if hapticsEnabled {
-                  UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                }
-              }, label: {
-                Image(systemName: hapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
-                  .font(.system(size: 24))
-                  .foregroundStyle(count.foregroundColor)
-                  .opacity(hapticsEnabled ? 1 : 0.4)
-                  .frame(width: 44, height: 44)
-              })
-              // 터치 영역은 유지하되 하단 바 높이는 늘리지 않아 숫자 위치가 바뀌지 않게 함
-              .padding(.vertical, -8)
-
-              Spacer()
-
-              ColorPicker("", selection: $count.backgroundColor)
-                .labelsHidden()
-                .onChange(of: count.backgroundColor) {
-                  saveMyStructArray()
-                }
-            }
-            .padding()
-            
-          }
-          .safeAreaPadding()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .background(count.backgroundColor)
-        }
+    TabView(selection: $selection) {
+      ForEach($store.counters) { $count in
+        counterPage($count)
+          .tag(Optional(count.id))
       }
+      addPage
+        .tag(Optional(Self.addPageID))
     }
     .ignoresSafeArea(.all)
     .ignoresSafeArea(.keyboard)
     .tabViewStyle(.page(indexDisplayMode: .always))
-    
-    .onAppear(perform: {
-      loadMyStructArray()
-    })
+    .onAppear {
+      if selection == nil {
+        selection = store.counters.first?.id
+      }
+    }
+    .task {
+      proStore.start()
+    }
+    .onChange(of: selection) {
+      deletingCounterID = nil
+      isEditingLabel = false
+    }
+    .onChange(of: scenePhase) {
+      guard scenePhase == .active else { return }
+      // 위젯·제어 센터·워치에서 바뀐 값 반영
+      store.reload()
+      if SharedStorage.consumePendingPaywall() {
+        showPaywall = true
+      }
+      Task { await proStore.refreshEntitlement() }
+    }
+    .onOpenURL { url in
+      if url.host == "pro" {
+        showPaywall = true
+      }
+    }
+    .sheet(isPresented: $showPaywall) {
+      PaywallView()
+    }
   }
-    
-    
-  private func commonAction(count: Binding<CountModel>) {
+
+  // MARK: - 카운터 페이지
+
+  private func counterPage(_ count: Binding<CountModel>) -> some View {
+    ZStack {
+      VStack(spacing: 0) {
+        GeometryReader { geo in
+          ZStack(alignment: .top) {
+            // 숫자는 전체 영역의 정가운데에 고정
+            Text("\(count.wrappedValue.value)")
+              .foregroundStyle(count.wrappedValue.foregroundColor)
+              .lineLimit(1)
+              .font(.system(size: geo.size.width))
+              .minimumScaleFactor(0.1)
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .contentShape(Rectangle())
+              .onTapGesture {
+                // 레이블 입력 중이면 키보드만 내림
+                if isEditingLabel {
+                  isEditingLabel = false
+                  return
+                }
+                commonAction(id: count.wrappedValue.id)
+              }
+              .onLongPressGesture(minimumDuration: 0.4, perform: {
+                isEditingLabel = false
+                stopRepeating()
+                let id = count.wrappedValue.id
+                // 리셋은 반복할 필요가 없으므로 한 번만 실행
+                guard mode != .reset else {
+                  commonAction(id: id)
+                  return
+                }
+                timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                  commonAction(id: id)
+                }
+              }, onPressingChanged: { isPressing in
+                // 손을 떼거나 스와이프로 제스처가 취소되면 반복 중단
+                if !isPressing {
+                  stopRepeating()
+                }
+              })
+
+            // 모드 버튼과 레이블은 숫자 위에 겹쳐서 배치
+            VStack(spacing: 0) {
+              Button(action: {
+                mode = mode.next()
+              }, label: {
+                switch mode {
+                case .plus:
+                  Image(systemName: "plus.circle")
+                    .resizable()
+                    .frame(width: 100, height: 100)
+                    .tint(.red)
+                    .padding()
+                case .minus:
+                  Image(systemName: "minus.circle")
+                    .resizable()
+                    .frame(width: 100, height: 100)
+                    .tint(.blue)
+                    .padding()
+                case .reset:
+                  Image(systemName: "arrow.clockwise.circle")
+                    .resizable()
+                    .frame(width: 100, height: 100)
+                    .tint(count.wrappedValue.backgroundColor.opposite)
+                    .padding()
+                }
+              })
+
+              // 비어 있으면 보이지 않고, 이 자리를 탭하면 바로 입력
+              TextField("", text: count.label)
+                .font(.system(size: 28, weight: .medium))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(count.wrappedValue.foregroundColor)
+                .tint(count.wrappedValue.foregroundColor)
+                .lineLimit(1)
+                .submitLabel(.done)
+                .focused($isEditingLabel)
+                .frame(height: 44)
+                .padding(.horizontal)
+                .onChange(of: count.wrappedValue.label) {
+                  store.save()
+                }
+            }
+            .padding(.top, 34)
+          }
+        }
+
+        HStack {
+          ColorPicker("", selection: count.foregroundColor)
+            .labelsHidden()
+            .onChange(of: count.wrappedValue.foregroundColor) {
+              store.save()
+            }
+          Spacer()
+
+          centerControl(for: count.wrappedValue)
+            // 터치 영역은 유지하되 하단 바 높이는 늘리지 않아 숫자 위치가 바뀌지 않게 함
+            .padding(.vertical, -8)
+
+          Spacer()
+
+          ColorPicker("", selection: count.backgroundColor)
+            .labelsHidden()
+            .onChange(of: count.wrappedValue.backgroundColor) {
+              store.save()
+            }
+        }
+        .padding()
+      }
+      .safeAreaPadding()
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(count.wrappedValue.backgroundColor)
+    }
+  }
+
+  /// 평소엔 진동 토글, 길게 누르면 삭제 버튼으로 바뀜
+  @ViewBuilder
+  private func centerControl(for count: CountModel) -> some View {
+    if deletingCounterID == count.id {
+      Image(systemName: "trash.circle.fill")
+        .font(.system(size: 28))
+        .foregroundStyle(.red)
+        .frame(width: 44, height: 44)
+        .contentShape(Rectangle())
+        .onTapGesture {
+          deleteCounter(id: count.id)
+        }
+        .accessibilityLabel("Delete")
+    } else {
+      Image(systemName: hapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
+        .font(.system(size: 24))
+        .foregroundStyle(count.foregroundColor)
+        .opacity(hapticsEnabled ? 1 : 0.4)
+        .frame(width: 44, height: 44)
+        .contentShape(Rectangle())
+        .onTapGesture {
+          hapticsEnabled.toggle()
+          if hapticsEnabled {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+          }
+        }
+        .onLongPressGesture(minimumDuration: 0.6) {
+          guard store.counters.count > 1 else { return }
+          UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+          withAnimation { deletingCounterID = count.id }
+          // 누르지 않으면 잠시 후 원래대로
+          DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            withAnimation {
+              if deletingCounterID == count.id { deletingCounterID = nil }
+            }
+          }
+        }
+        .accessibilityAddTraits(.isButton)
+    }
+  }
+
+  // MARK: - 카운터 추가 페이지
+
+  private var addPage: some View {
+    ZStack {
+      Color.black
+      Button(action: addCounter) {
+        Image(systemName: "plus.circle")
+          .resizable()
+          .frame(width: 100, height: 100)
+          .foregroundStyle(.white.opacity(0.8))
+          .overlay(alignment: .bottomTrailing) {
+            // 더 추가하려면 Pro가 필요하다는 표시
+            if !store.canAddCounter {
+              Image(systemName: "lock.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(.yellow, .black)
+                .offset(x: 8, y: 8)
+            }
+          }
+      }
+      .accessibilityLabel("Add")
+    }
+    .ignoresSafeArea()
+  }
+
+  // MARK: - 동작
+
+  private func commonAction(id: UUID) {
     if hapticsEnabled {
       let generator = UIImpactFeedbackGenerator(style: .medium)
       generator.impactOccurred()
     }
-    switch mode {
-    case .plus:
-      count.wrappedValue.value += 1
-    case .minus:
-      count.wrappedValue.value -= 1
-    case .reset:
-      count.wrappedValue.value = 0
-    }
-    
-    saveMyStructArray()
+    store.apply(mode, to: id)
   }
+
   private func stopRepeating() {
     timer?.invalidate()
     timer = nil
   }
-  private func saveMyStructArray() {
-    do {
-      let encoder = JSONEncoder()
-      let data = try encoder.encode(counts)
-      countsData = data
-    } catch {
-      print("Failed to encode MyStruct array: \(error.localizedDescription)")
+
+  private func addCounter() {
+    guard let counter = store.addCounter() else {
+      showPaywall = true
+      return
+    }
+    withAnimation {
+      selection = counter.id
     }
   }
-  
-  private func loadMyStructArray() {
-    do {
-      let decoder = JSONDecoder()
-      counts = try decoder.decode([CountModel].self, from: countsData)
-    } catch {
-      print("Failed to decode MyStruct array: \(error.localizedDescription)")
+
+  private func deleteCounter(id: UUID) {
+    guard let index = store.counters.firstIndex(where: { $0.id == id }) else { return }
+    // 삭제 후에는 옆 카운터로 이동
+    let neighbor = index > 0 ? store.counters[index - 1] : store.counters[index + 1]
+    deletingCounterID = nil
+    withAnimation {
+      selection = neighbor.id
+    }
+    // 페이지 이동과 삭제가 동시에 일어나면 엉뚱한 페이지로 가므로, 이동이 끝난 뒤 삭제
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+      store.deleteCounter(id: id)
     }
   }
 }
