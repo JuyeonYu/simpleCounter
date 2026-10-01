@@ -51,10 +51,14 @@ extension Color {
     var alpha: CGFloat = 0
     
     uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-    
-    let r = Int(red * 255)
-    let g = Int(green * 255)
-    let b = Int(blue * 255)
+
+    // Display P3 등 넓은 색역의 색은 0~1 범위를 벗어나므로 잘라낸 뒤 반올림
+    func toByte(_ value: CGFloat) -> Int {
+      Int((min(max(value, 0), 1) * 255).rounded())
+    }
+    let r = toByte(red)
+    let g = toByte(green)
+    let b = toByte(blue)
     
     return String(format: "#%02X%02X%02X", r, g, b)
   }

@@ -17,7 +17,7 @@ struct CountModel: Codable, Identifiable {
   
   var backgroundColor: Color {
     get {
-      Color(hex: backgroundColorHex)!
+      Color(hex: backgroundColorHex) ?? .black
     }
     set {
       backgroundColorHex = newValue.toHex() ?? ""
@@ -25,7 +25,7 @@ struct CountModel: Codable, Identifiable {
   }
   var foregroundColor: Color {
     get {
-      Color(hex: foregroundColorHex)!
+      Color(hex: foregroundColorHex) ?? .white
     }
     set {
       foregroundColorHex = newValue.toHex() ?? ""
@@ -106,23 +106,19 @@ struct ContentView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-              commonAction(count: &count)
+              commonAction(count: $count)
             }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                      timer?.invalidate()
-                      timer = nil
-
-                      timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                        commonAction(count: &count)
-                      }
-                    }
-                    .onEnded { _ in
-                      timer?.invalidate()
-                      timer = nil
-                    }
-            )
+            .onLongPressGesture(minimumDuration: 0.4, perform: {
+              stopRepeating()
+              timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                commonAction(count: $count)
+              }
+            }, onPressingChanged: { isPressing in
+              // 손을 떼거나 스와이프로 제스처가 취소되면 반복 중단
+              if !isPressing {
+                stopRepeating()
+              }
+            })
 
 
             
@@ -158,19 +154,23 @@ struct ContentView: View {
   }
     
     
-  private func commonAction( count: inout CountModel) {
+  private func commonAction(count: Binding<CountModel>) {
     let generator = UIImpactFeedbackGenerator(style: .medium)
     generator.impactOccurred()
     switch mode {
     case .plus:
-      count.value += 1
+      count.wrappedValue.value += 1
     case .minus:
-      count.value -= 1
+      count.wrappedValue.value -= 1
     case .reset:
-      count.value = 0
+      count.wrappedValue.value = 0
     }
     
     saveMyStructArray()
+  }
+  private func stopRepeating() {
+    timer?.invalidate()
+    timer = nil
   }
   private func saveMyStructArray() {
     do {
